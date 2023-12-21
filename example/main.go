@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	excelizemapper "excelize-mapper"
+	excelizemapper "github.com/a631807682/excelize-mapper"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -40,7 +40,10 @@ var SexFormat = func(value interface{}) string {
 	}
 }
 
+const dt = "2023-12-21T15:38:29.808+08:00"
+
 func example1() {
+	ct, _ := time.Parse(time.RFC3339, dt)
 	data := []User{
 		{
 			ID:        1,
@@ -48,14 +51,14 @@ func example1() {
 			Desc:      "This is a long text, it will be wrapped.",
 			Sex:       SexMale,
 			Address:   "Singapore",
-			CreatedAt: time.Now(),
+			CreatedAt: ct,
 		}, {
 			ID:        2,
 			Name:      "Jerry",
 			Desc:      "This is a long text.",
 			Sex:       SexFemale,
 			Address:   "",
-			CreatedAt: time.Now(),
+			CreatedAt: ct,
 		},
 	}
 
