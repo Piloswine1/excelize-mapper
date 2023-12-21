@@ -10,7 +10,8 @@ import (
 const defaultTagKey = "excelize-mapper"
 
 type ExcelizeMapper struct {
-	ops options
+	options options
+	parser  parser
 }
 
 func NewExcelizeMapper(opts ...Option) ExcelizeMapper {
@@ -23,29 +24,34 @@ func NewExcelizeMapper(opts ...Option) ExcelizeMapper {
 	}
 
 	return ExcelizeMapper{
-		ops: op,
+		options: op,
+		parser: parser{
+			tagKey:        op.TagKey,
+			tagDelim:      ";",
+			tagHeaderKey:  "header",
+			tagIndexKey:   "index",
+			tagDefaultKey: "default",
+			tagFormatKey:  "format",
+			tagWidthKey:   "width",
+		},
 	}
 }
 
 func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interface{}) error {
-	p := parser{
-		tagKey:        em.ops.TagKey,
-		tagDelim:      ";",
-		tagHeaderKey:  "header",
-		tagIndexKey:   "index",
-		tagDefaultKey: "default",
-		tagFormatKey:  "format",
-		tagWidthKey:   "width",
-	}
-
-	cells, err := p.parse(slice)
+	cells, err := em.parser.parse(slice)
 	if err != nil {
 		return err
 	}
 
 	headers := make([]string, 0, len(cells))
+	currentIndex := 0
 	for _, cell := range cells {
+		for ; currentIndex < cell.CellIndex; currentIndex++ { // skip index
+			headers = append(headers, "")
+		}
+
 		headers = append(headers, cell.HeaderName)
+		currentIndex++
 	}
 
 	err = f.SetSheetRow(sheet, "A1", &headers)
@@ -57,19 +63,24 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 	for rowIndex := 0; rowIndex < di.Len(); rowIndex++ {
 		rowVal := reflect.Indirect(di.Index(rowIndex))
 		vals := make([]interface{}, 0, len(cells))
-		for _, fieldInfo := range cells {
-			fieldValue := rowVal.FieldByName(fieldInfo.FieldName)
+		currentIndex := 0
+		for _, cell := range cells {
+			for ; currentIndex < cell.CellIndex; currentIndex++ { // skip index
+				vals = append(vals, "")
+			}
+			fieldValue := rowVal.FieldByName(cell.FieldName)
 
-			if fieldValue.IsZero() && fieldInfo.DefaultValue != "" {
-				fieldValue = reflect.ValueOf(fieldInfo.DefaultValue)
+			if fieldValue.IsZero() && cell.DefaultValue != "" {
+				fieldValue = reflect.ValueOf(cell.DefaultValue)
 			}
 
-			if format, ok := em.ops.FormatterMap[fieldInfo.FormatterKey]; ok {
+			if format, ok := em.options.FormatterMap[cell.FormatterKey]; ok {
 				formatVal := format(fieldValue.Interface())
 				fieldValue = reflect.ValueOf(formatVal)
 			}
 
 			vals = append(vals, fieldValue.Interface())
+			currentIndex++
 		}
 
 		cell, err := excelize.CoordinatesToCellName(1, rowIndex+2)
@@ -84,3 +95,7 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 
 	return nil
 }
+
+// func (em *ExcelizeMapper) GetData(f *excelize.File, sheet string, slice interface{}) error {
+
+// }

@@ -28,7 +28,8 @@ type baseExportModel struct {
 	String string `excelize-mapper:"index:14;header:String"`
 	Bool   bool   `excelize-mapper:"index:15;header:Bool"`
 
-	Time time.Time `excelize-mapper:"index:16;header:Time"`
+	Time      time.Time `excelize-mapper:"index:16;header:Time"`
+	NextIndex string    `excelize-mapper:"index:18;header:NextIndex"` // skip index 17
 }
 
 var baseExportData = baseExportModel{
@@ -51,7 +52,8 @@ var baseExportData = baseExportModel{
 	String: "string",
 	Bool:   true,
 
-	Time: time.Now(),
+	Time:      time.Now(),
+	NextIndex: "nextIndex",
 }
 
 func TestBaseTypeExportExcel(t *testing.T) {
