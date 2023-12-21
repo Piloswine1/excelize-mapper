@@ -20,22 +20,21 @@ type parser struct {
 	tagWidthKey   string
 }
 
-func (p *parser) parse(data interface{}) ([]Cell, error) {
+func (p *parser) parse(data interface{}) ([]Column, error) {
 	dv := reflect.ValueOf(data)
 	di := reflect.Indirect(dv)
 	dk := di.Kind()
 
 	if dk != reflect.Array && dk != reflect.Slice {
-		return nil, fmt.Errorf("datas not array or slice")
+		return nil, fmt.Errorf("data not array or slice")
 	}
 
 	itemType := di.Type().Elem()
 	if itemType.Kind() == reflect.Ptr {
 		itemType = itemType.Elem()
-
 	}
 
-	cells := make([]Cell, 0, 10)
+	cols := make([]Column, 0, 10)
 	index := 0
 	for fieldIndex := 0; fieldIndex < itemType.NumField(); fieldIndex++ {
 		fullTagVal := itemType.Field(fieldIndex).Tag.Get(p.tagKey)
@@ -43,10 +42,10 @@ func (p *parser) parse(data interface{}) ([]Cell, error) {
 		if fullTagVal != "" {
 			tags := p.parseTags(fullTagVal)
 			if _, ok := tags[p.tagHeaderKey]; ok {
-				var cellWidth float64
+				var colWidth float64
 				if widthStr, ok := tags[p.tagWidthKey]; ok {
 					if val, err := strconv.ParseFloat(widthStr, 64); err == nil {
-						cellWidth = val
+						colWidth = val
 					}
 				}
 
@@ -58,25 +57,25 @@ func (p *parser) parse(data interface{}) ([]Cell, error) {
 					index, _ = strconv.Atoi(cellIndex)
 				}
 
-				cell := Cell{
-					CellIndex:    index,
+				cell := Column{
+					ColumnIndex:  index,
 					HeaderName:   tags[p.tagHeaderKey],
-					CellWidth:    cellWidth,
+					ColumnWidth:  colWidth,
 					DefaultValue: tags[p.tagDefaultKey],
 					FormatterKey: tags[p.tagFormatKey],
 					FieldName:    itemType.Field(fieldIndex).Name,
 				}
-				cells = append(cells, cell)
+				cols = append(cols, cell)
 			}
 			index++
 		}
 	}
 
-	sort.Slice(cells, func(i, j int) bool {
-		return cells[i].CellIndex < cells[j].CellIndex
+	sort.Slice(cols, func(i, j int) bool {
+		return cols[i].ColumnIndex < cols[j].ColumnIndex
 	})
 
-	return cells, nil
+	return cols, nil
 }
 
 func (p *parser) parseTags(tag string) map[string]string {

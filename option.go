@@ -1,9 +1,11 @@
 package excelizemapper
 
+type Format func(interface{}) string
+
 type options struct {
 	tagKey       string
 	autoSort     bool
-	formatterMap map[string]func(interface{}) string
+	formatterMap map[string]Format
 }
 
 type Option func(o *options)
@@ -18,7 +20,7 @@ func WithTagKey(tagKey string) Option {
 }
 
 // WithFormatter set formatter
-func WithFormatter(name string, format func(interface{}) string) Option {
+func WithFormatter(name string, format Format) Option {
 	return func(o *options) {
 		o.formatterMap[name] = format
 	}

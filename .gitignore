@@ -1,2 +1,2 @@
-*.xlsx
-testData
+testData/*xlsx
+!exmaple/exmaple.xlsx

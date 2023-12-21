@@ -1,9 +1,9 @@
 package excelizemapper
 
-type Cell struct {
+type Column struct {
 	HeaderName   string
-	CellWidth    float64
-	CellIndex    int
+	ColumnWidth  float64
+	ColumnIndex  int
 	DefaultValue string
 	FormatterKey string
 	FieldName    string
