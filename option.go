@@ -5,6 +5,7 @@ type Format func(interface{}) string
 type options struct {
 	tagKey       string
 	autoSort     bool
+	defaultWidth float64
 	formatterMap map[string]Format
 }
 
@@ -32,5 +33,12 @@ func WithFormatter(name string, format Format) Option {
 func WithAutoSort(autoSort bool) Option {
 	return func(o *options) {
 		o.autoSort = autoSort
+	}
+}
+
+// WithDefaultWidth set default width
+func WithDefaultWidth(width float64) Option {
+	return func(o *options) {
+		o.defaultWidth = width
 	}
 }

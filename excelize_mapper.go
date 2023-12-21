@@ -64,12 +64,16 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 		headers = append(headers, column.HeaderName)
 		currentIndex++
 
-		if column.ColumnWidth > 0 { // set column width
+		width := em.options.defaultWidth
+		if column.ColumnWidth > 0 {
+			width = column.ColumnWidth
+		}
+		if width > 0 { // set column width
 			col, err := excelize.ColumnNumberToName(currentIndex)
 			if err != nil {
 				return fmt.Errorf("excelize ColumnNumberToName error: %w", err)
 			}
-			f.SetColWidth(sheet, col, col, column.ColumnWidth)
+			f.SetColWidth(sheet, col, col, width)
 		}
 	}
 

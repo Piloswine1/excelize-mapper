@@ -82,7 +82,7 @@ func example1() {
 type User2 struct {
 	ID   int
 	Name string `excelize-mapper:"header:Name;index:0;"`
-	Desc string `excelize-mapper:"header:Desc;width:50;index:2"`
+	Desc string `excelize-mapper:"header:Desc;index:2"`
 	Sex  Sex    `excelize-mapper:"header:Sex;format:sex;index:1"`
 }
 
@@ -105,6 +105,7 @@ func example2() {
 
 	m := excelizemapper.NewExcelizeMapper(
 		excelizemapper.WithAutoSort(false),
+		excelizemapper.WithDefaultWidth(40),
 		excelizemapper.WithFormatter("sex", SexFormat),
 	)
 	err := m.SetData(f, "Sheet1", data)
