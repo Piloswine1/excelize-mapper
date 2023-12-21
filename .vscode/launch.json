@@ -5,15 +5,11 @@
     "version": "0.2.0",
     "configurations": [
     {
-            "name": "Launch test function",
+            "name": "Launch test all",
             "type": "go",
             "request": "launch",
             "mode": "test",
-            "program": "${workspaceFolder}/excelizemapper_test.go",
-            "args": [
-                "-test.run",
-                "TestBaseTypeExportExcel",
-            ],
+            "program": "${workspaceFolder}/excelizemapper_test.go"
         }
     ]
 }

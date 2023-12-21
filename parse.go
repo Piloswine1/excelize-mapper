@@ -10,8 +10,9 @@ import (
 
 type parser struct {
 	tagKey   string
-	tagDelim string
+	autosort bool
 
+	tagDelim      string
 	tagHeaderKey  string
 	tagIndexKey   string
 	tagDefaultKey string
@@ -35,11 +36,13 @@ func (p *parser) parse(data interface{}) ([]Cell, error) {
 	}
 
 	cells := make([]Cell, 0, 10)
+	index := 0
 	for fieldIndex := 0; fieldIndex < itemType.NumField(); fieldIndex++ {
 		fullTagVal := itemType.Field(fieldIndex).Tag.Get(p.tagKey)
+
 		if fullTagVal != "" {
 			tags := p.parseTags(fullTagVal)
-			if cellIndex, ok := tags[p.tagIndexKey]; ok {
+			if _, ok := tags[p.tagHeaderKey]; ok {
 				var cellWidth float64
 				if widthStr, ok := tags[p.tagWidthKey]; ok {
 					if val, err := strconv.ParseFloat(widthStr, 64); err == nil {
@@ -47,7 +50,14 @@ func (p *parser) parse(data interface{}) ([]Cell, error) {
 					}
 				}
 
-				index, _ := strconv.Atoi(cellIndex)
+				if !p.autosort { // use custom index
+					cellIndex, ok := tags[p.tagIndexKey]
+					if !ok {
+						continue
+					}
+					index, _ = strconv.Atoi(cellIndex)
+				}
+
 				cell := Cell{
 					CellIndex:    index,
 					HeaderName:   tags[p.tagHeaderKey],
@@ -58,6 +68,7 @@ func (p *parser) parse(data interface{}) ([]Cell, error) {
 				}
 				cells = append(cells, cell)
 			}
+			index++
 		}
 	}
 

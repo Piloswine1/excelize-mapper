@@ -16,7 +16,8 @@ type ExcelizeMapper struct {
 
 func NewExcelizeMapper(opts ...Option) ExcelizeMapper {
 	op := options{
-		TagKey: defaultTagKey,
+		tagKey:   defaultTagKey,
+		autoSort: true,
 	}
 
 	for _, opt := range opts {
@@ -26,7 +27,8 @@ func NewExcelizeMapper(opts ...Option) ExcelizeMapper {
 	return ExcelizeMapper{
 		options: op,
 		parser: parser{
-			tagKey:        op.TagKey,
+			tagKey:        op.tagKey,
+			autosort:      op.autoSort,
 			tagDelim:      ";",
 			tagHeaderKey:  "header",
 			tagIndexKey:   "index",
@@ -63,6 +65,7 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 	for rowIndex := 0; rowIndex < di.Len(); rowIndex++ {
 		rowVal := reflect.Indirect(di.Index(rowIndex))
 		vals := make([]interface{}, 0, len(cells))
+
 		currentIndex := 0
 		for _, cell := range cells {
 			for ; currentIndex < cell.CellIndex; currentIndex++ { // skip index
@@ -74,7 +77,7 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 				fieldValue = reflect.ValueOf(cell.DefaultValue)
 			}
 
-			if format, ok := em.options.FormatterMap[cell.FormatterKey]; ok {
+			if format, ok := em.options.formatterMap[cell.FormatterKey]; ok {
 				formatVal := format(fieldValue.Interface())
 				fieldValue = reflect.ValueOf(formatVal)
 			}

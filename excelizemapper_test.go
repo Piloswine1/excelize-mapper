@@ -7,7 +7,21 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-type baseExportModel struct {
+type baseModel struct {
+	Int   int   `excelize-mapper:"header:Int"`
+	Int8  int8  `excelize-mapper:"header:Int8"`
+	Int16 int16 `excelize-mapper:"header:Int16"`
+	Int32 int32 `excelize-mapper:"header:Int32"`
+}
+
+var baseData = baseModel{
+	Int:   int(1<<31 - 1),
+	Int8:  int8(1<<7 - 1),
+	Int16: int16(1<<15 - 1),
+	Int32: int32(1<<31 - 1),
+}
+
+type customSortModel struct {
 	Int   int   `excelize-mapper:"index:0;header:Int"`
 	Int8  int8  `excelize-mapper:"index:1;header:Int8"`
 	Int16 int16 `excelize-mapper:"index:2;header:Int16"`
@@ -32,7 +46,7 @@ type baseExportModel struct {
 	NextIndex string    `excelize-mapper:"index:18;header:NextIndex"` // skip index 17
 }
 
-var baseExportData = baseExportModel{
+var customSortData = customSortModel{
 	Int:    int(1<<31 - 1),
 	Int8:   int8(1<<7 - 1),
 	Int16:  int16(1<<15 - 1),
@@ -56,11 +70,11 @@ var baseExportData = baseExportModel{
 	NextIndex: "nextIndex",
 }
 
-func TestBaseTypeExportExcel(t *testing.T) {
+func TestSetData(t *testing.T) {
 	sheetName := "sheet1"
 
-	originData := make([]baseExportModel, 0)
-	originData = append(originData, baseExportData, baseExportData)
+	originData := make([]baseModel, 0)
+	originData = append(originData, baseData, baseData)
 
 	f := excelize.NewFile()
 	defer f.Close()
@@ -72,7 +86,26 @@ func TestBaseTypeExportExcel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.SaveAs("./testData/test.xlsx")
+	f.SaveAs("./testData/base.xlsx")
+}
+
+func TestCustomSortSetData(t *testing.T) {
+	sheetName := "sheet1"
+
+	originData := make([]customSortModel, 0)
+	originData = append(originData, customSortData, customSortData)
+
+	f := excelize.NewFile()
+	defer f.Close()
+
+	mapper := NewExcelizeMapper(WithAutoSort(false))
+
+	err := mapper.SetData(f, sheetName, originData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.SaveAs("./testData/custom_sort.xlsx")
 }
 
 // func TestSlicePtrStructExportExcel(t *testing.T) {
