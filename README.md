@@ -12,7 +12,7 @@ refer to <https://github.com/qax-os/excelize/issues/619>
 
 ## TODO
 
-[ ] Improve doc.
-[ ] Improve test coverage.
-[ ] Add test snapshot.
-[ ] Read file by go tag.
+- [ ] Improve doc.
+- [ ] Improve test coverage.
+- [ ] Add test snapshot.
+- [ ] Read file by go tag.
