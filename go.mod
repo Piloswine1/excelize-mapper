@@ -1,4 +1,4 @@
-module github.com/a631807682/excelize-mapper
+module github.com/mking93/excelize-mapper
 
 go 1.20
 
