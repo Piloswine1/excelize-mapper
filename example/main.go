@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	excelizemapper "github.com/a631807682/excelize-mapper"
+	excelizemapper "github.com/mking93/excelize-mapper"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -23,7 +23,7 @@ const (
 type User struct {
 	ID        int
 	Name      string    `excelize-mapper:"header:Name"`
-	Desc      string    `excelize-mapper:"header:Desc;width:50"`
+	Desc      *string   `excelize-mapper:"header:Desc;width:50"`
 	Sex       Sex       `excelize-mapper:"header:Sex;format:sex"`
 	Address   string    `excelize-mapper:"header:Address;default:China"`
 	CreatedAt time.Time `excelize-mapper:"header:CreatedAt"`
@@ -48,19 +48,19 @@ func example1() {
 		{
 			ID:        1,
 			Name:      "Tom",
-			Desc:      "This is a long text, it will be wrapped.",
 			Sex:       SexMale,
 			Address:   "Singapore",
 			CreatedAt: ct,
 		}, {
 			ID:        2,
 			Name:      "Jerry",
-			Desc:      "This is a long text.",
 			Sex:       SexFemale,
 			Address:   "",
 			CreatedAt: ct,
 		},
 	}
+	sstr := "qwerty qaz"
+	data[0].Desc = &sstr
 
 	f := excelize.NewFile()
 	defer f.Close()
