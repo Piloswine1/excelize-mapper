@@ -94,8 +94,16 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 			}
 			fieldValue := rowVal.FieldByName(column.FieldName)
 
-			if fieldValue.IsZero() && column.DefaultValue != "" {
+			if fieldValue.Kind() == reflect.Ptr {
+				if fieldValue.IsNil() {
+					fieldValue = (reflect.Zero(fieldValue.Type()))
+				} else {
+					fieldValue = (fieldValue.Elem())
+				}
+			} else if fieldValue.IsZero() && column.DefaultValue != "" {
 				fieldValue = reflect.ValueOf(column.DefaultValue)
+			} else {
+				fieldValue = (fieldValue)
 			}
 
 			if format, ok := em.options.formatterMap[column.FormatterKey]; ok {
