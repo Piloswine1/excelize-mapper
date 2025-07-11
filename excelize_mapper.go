@@ -3,6 +3,7 @@ package excelizemapper
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -57,23 +58,25 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 	headers := make([]string, 0, len(columns))
 	currentIndex := 0
 	for _, column := range columns {
-		for ; currentIndex < column.ColumnIndex; currentIndex++ { // skip index
+		for ; currentIndex < column.ColumnIndex; currentIndex++ {
 			headers = append(headers, "")
 		}
 
 		headers = append(headers, column.HeaderName)
-		currentIndex++
+		currentIndex = column.ColumnIndex + 1
+	}
 
+	for _, column := range columns {
 		width := em.options.defaultWidth
 		if column.ColumnWidth > 0 {
 			width = column.ColumnWidth
 		}
-		if width > 0 { // set column width
-			col, err := excelize.ColumnNumberToName(currentIndex)
+		if width > 0 {
+			colName, err := excelize.ColumnNumberToName(column.ColumnIndex + 1)
 			if err != nil {
 				return fmt.Errorf("excelize ColumnNumberToName error: %w", err)
 			}
-			f.SetColWidth(sheet, col, col, width)
+			f.SetColWidth(sheet, colName, colName, width)
 		}
 	}
 
@@ -87,23 +90,22 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 		rowVal := reflect.Indirect(di.Index(rowIndex))
 		vals := make([]interface{}, 0, len(columns))
 
-		currentIndex := 0
+		currentIndex = 0
 		for _, column := range columns {
-			for ; currentIndex < column.ColumnIndex; currentIndex++ { // skip index
+			for ; currentIndex < column.ColumnIndex; currentIndex++ {
 				vals = append(vals, "")
 			}
-			fieldValue := rowVal.FieldByName(column.FieldName)
+
+			fieldValue := getNestedFieldValue(rowVal, column.FieldName)
 
 			if fieldValue.Kind() == reflect.Ptr {
 				if fieldValue.IsNil() {
-					fieldValue = (reflect.Zero(fieldValue.Type()))
+					fieldValue = reflect.Zero(fieldValue.Type().Elem())
 				} else {
-					fieldValue = (fieldValue.Elem())
+					fieldValue = fieldValue.Elem()
 				}
 			} else if fieldValue.IsZero() && column.DefaultValue != "" {
 				fieldValue = reflect.ValueOf(column.DefaultValue)
-			} else {
-				fieldValue = (fieldValue)
 			}
 
 			if format, ok := em.options.formatterMap[column.FormatterKey]; ok {
@@ -112,13 +114,15 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 			}
 
 			vals = append(vals, fieldValue.Interface())
-			currentIndex++
+
+			currentIndex = column.ColumnIndex + 1
 		}
 
 		cell, err := excelize.CoordinatesToCellName(1, rowIndex+2)
 		if err != nil {
 			return fmt.Errorf("excelize CoordinatesToCellName error: %w", err)
 		}
+
 		err = f.SetSheetRow(sheet, cell, &vals)
 		if err != nil {
 			return fmt.Errorf("excelize SetSheetRow error: %w", err)
@@ -126,4 +130,19 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 	}
 
 	return nil
+}
+
+func getNestedFieldValue(v reflect.Value, fieldPath string) reflect.Value {
+	parts := strings.Split(fieldPath, ".")
+	for _, part := range parts {
+		if v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				v = reflect.Zero(v.Type().Elem())
+			} else {
+				v = v.Elem()
+			}
+		}
+		v = v.FieldByName(part)
+	}
+	return v
 }

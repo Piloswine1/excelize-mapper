@@ -34,41 +34,9 @@ func (p *parser) parse(data interface{}) ([]Column, error) {
 		itemType = itemType.Elem()
 	}
 
-	cols := make([]Column, 0, 10)
-	index := 0
-	for fieldIndex := 0; fieldIndex < itemType.NumField(); fieldIndex++ {
-		fullTagVal := itemType.Field(fieldIndex).Tag.Get(p.tagKey)
-
-		if fullTagVal != "" {
-			tags := p.parseTags(fullTagVal)
-			if _, ok := tags[p.tagHeaderKey]; ok {
-				var colWidth float64
-				if widthStr, ok := tags[p.tagWidthKey]; ok {
-					if val, err := strconv.ParseFloat(widthStr, 64); err == nil {
-						colWidth = val
-					}
-				}
-
-				if !p.autosort { // use custom index
-					cellIndex, ok := tags[p.tagIndexKey]
-					if !ok {
-						continue
-					}
-					index, _ = strconv.Atoi(cellIndex)
-				}
-
-				cell := Column{
-					ColumnIndex:  index,
-					HeaderName:   tags[p.tagHeaderKey],
-					ColumnWidth:  colWidth,
-					DefaultValue: tags[p.tagDefaultKey],
-					FormatterKey: tags[p.tagFormatKey],
-					FieldName:    itemType.Field(fieldIndex).Name,
-				}
-				cols = append(cols, cell)
-			}
-			index++
-		}
+	cols, err := p.parseFieldsRecursive(itemType, "")
+	if err != nil {
+		return nil, err
 	}
 
 	sort.Slice(cols, func(i, j int) bool {
@@ -87,7 +55,7 @@ func (p *parser) parseTags(tag string) map[string]string {
 			continue
 		}
 
-		kvSlice := strings.Split(t, ":")
+		kvSlice := strings.SplitN(t, ":", 2)
 		if len(kvSlice) != 2 {
 			continue
 		}
@@ -95,4 +63,73 @@ func (p *parser) parseTags(tag string) map[string]string {
 		kv[kvSlice[0]] = kvSlice[1]
 	}
 	return kv
+}
+
+func (p *parser) parseFieldsRecursive(t reflect.Type, prefix string) ([]Column, error) {
+	var cols []Column
+	autoIndex := 0
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+
+		if !field.IsExported() {
+			continue
+		}
+
+		if field.Type.Kind() == reflect.Struct && field.Anonymous {
+			nestedCols, err := p.parseFieldsRecursive(field.Type, prefix+field.Name+".")
+			if err != nil {
+				return nil, err
+			}
+			cols = append(cols, nestedCols...)
+			continue
+		}
+
+		fullTagVal := field.Tag.Get(p.tagKey)
+		if fullTagVal == "" {
+			continue
+		}
+
+		tags := p.parseTags(fullTagVal)
+		header, ok := tags[p.tagHeaderKey]
+		if !ok {
+			continue
+		}
+
+		var colWidth float64
+		if widthStr, ok := tags[p.tagWidthKey]; ok {
+			if val, err := strconv.ParseFloat(widthStr, 64); err == nil {
+				colWidth = val
+			}
+		}
+
+		var colIndex int
+		if !p.autosort {
+			indexStr, ok := tags[p.tagIndexKey]
+			if !ok {
+				continue
+			}
+			idx, err := strconv.Atoi(indexStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid index value %q for field %s", indexStr, field.Name)
+			}
+			colIndex = idx
+		} else {
+			colIndex = autoIndex
+			autoIndex++
+		}
+
+		col := Column{
+			ColumnIndex:  colIndex,
+			HeaderName:   header,
+			ColumnWidth:  colWidth,
+			DefaultValue: tags[p.tagDefaultKey],
+			FormatterKey: tags[p.tagFormatKey],
+			FieldName:    prefix + field.Name,
+		}
+
+		cols = append(cols, col)
+	}
+
+	return cols, nil
 }
