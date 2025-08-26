@@ -2,6 +2,7 @@ package excelizemapper
 
 import (
 	"fmt"
+	"log/slog"
 	"reflect"
 	"sort"
 	"strconv"
@@ -12,21 +13,24 @@ type parser struct {
 	tagKey   string
 	autosort bool
 
-	tagDelim      string
-	tagHeaderKey  string
-	tagIndexKey   string
-	tagDefaultKey string
-	tagFormatKey  string
-	tagWidthKey   string
+	tagDelim         string
+	tagHeaderKey     string
+	tagIndexKey      string
+	tagDefaultKey    string
+	tagFormatKey     string
+	tagWidthKey      string
+	tagDynamicKey    string
+	tagDynamicPosKey string
+	tagDynamicValKey string
 }
 
-func (p *parser) parse(data interface{}) ([]Column, error) {
+func (p *parser) parse(data interface{}) ([]Column, *DynamicRules, error) {
 	dv := reflect.ValueOf(data)
 	di := reflect.Indirect(dv)
 	dk := di.Kind()
 
 	if dk != reflect.Array && dk != reflect.Slice {
-		return nil, fmt.Errorf("data not array or slice")
+		return nil, nil, fmt.Errorf("data not array or slice")
 	}
 
 	itemType := di.Type().Elem()
@@ -34,16 +38,16 @@ func (p *parser) parse(data interface{}) ([]Column, error) {
 		itemType = itemType.Elem()
 	}
 
-	cols, err := p.parseFieldsRecursive(itemType, "")
+	cols, rules, err := p.parseFieldsRecursive(itemType, "")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	sort.Slice(cols, func(i, j int) bool {
 		return cols[i].ColumnIndex < cols[j].ColumnIndex
 	})
 
-	return cols, nil
+	return cols, rules, nil
 }
 
 func (p *parser) parseTags(tag string) map[string]string {
@@ -65,8 +69,81 @@ func (p *parser) parseTags(tag string) map[string]string {
 	return kv
 }
 
-func (p *parser) parseFieldsRecursive(t reflect.Type, prefix string) ([]Column, error) {
+type DynamicRules struct {
+	Mappings        map[string]string
+	ValueField      string
+	ParentFieldName string
+	ParentRule      string
+}
+
+func (dr *DynamicRules) getReplacedHeader(entryVal reflect.Value) string {
+	colHeader := dr.ParentRule
+	for pos, field := range dr.Mappings {
+		slog.Debug("field", "name", field)
+
+		fieldRef := entryVal.FieldByName(field)
+		slog.Debug("fieldRef", "name", fieldRef.Interface())
+
+		colHeader = strings.ReplaceAll(colHeader, pos, fmt.Sprint(fieldRef.Interface()))
+		slog.Debug("colHeader", "name", colHeader)
+	}
+	return colHeader
+}
+
+func (p *parser) getDynamicRules(dynamicSlice reflect.StructField) *DynamicRules {
+
+	mappings := make(map[string]string)
+	var valField string
+
+	t := dynamicSlice.Type.Elem()
+	for i := 0; i < t.NumField(); i++ {
+
+		field := t.Field(i)
+
+		if !field.IsExported() {
+			continue
+		}
+
+		tags := p.getTagsByKey(field)
+		slog.Debug("parsed tags", "value", tags)
+
+		if tags == nil {
+			continue
+		}
+
+		if posKey, ok := tags[p.tagDynamicPosKey]; ok {
+			mappings[posKey] = field.Name
+			continue
+		}
+
+		if _, ok := tags[p.tagDynamicValKey]; ok {
+			valField = field.Name
+			slog.Debug("found valField", "value", valField)
+			continue
+		}
+
+	}
+
+	return &DynamicRules{
+		Mappings:        mappings,
+		ValueField:      valField,
+		ParentFieldName: dynamicSlice.Name,
+	}
+
+}
+
+func (p *parser) getTagsByKey(dynamicSlice reflect.StructField) map[string]string {
+	fullTagVal := dynamicSlice.Tag.Get(p.tagKey)
+	if fullTagVal == "" {
+		return nil
+	}
+
+	return p.parseTags(fullTagVal)
+}
+
+func (p *parser) parseFieldsRecursive(t reflect.Type, prefix string) ([]Column, *DynamicRules, error) {
 	var cols []Column
+	var dynamicRules *DynamicRules
 	autoIndex := 0
 
 	for i := 0; i < t.NumField(); i++ {
@@ -77,20 +154,26 @@ func (p *parser) parseFieldsRecursive(t reflect.Type, prefix string) ([]Column, 
 		}
 
 		if field.Type.Kind() == reflect.Struct && field.Anonymous {
-			nestedCols, err := p.parseFieldsRecursive(field.Type, prefix+field.Name+".")
+			nestedCols, _, err := p.parseFieldsRecursive(field.Type, prefix+field.Name+".")
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			cols = append(cols, nestedCols...)
 			continue
 		}
 
-		fullTagVal := field.Tag.Get(p.tagKey)
-		if fullTagVal == "" {
+		tags := p.getTagsByKey(field)
+		if tags == nil {
 			continue
 		}
 
-		tags := p.parseTags(fullTagVal)
+		parentRule, hasDynamicTag := tags[p.tagDynamicKey]
+		if field.Type.Kind() == reflect.Slice && hasDynamicTag {
+			dynamicRules = p.getDynamicRules(field)
+			dynamicRules.ParentRule = parentRule
+			continue
+		}
+
 		header, ok := tags[p.tagHeaderKey]
 		if !ok {
 			continue
@@ -111,7 +194,7 @@ func (p *parser) parseFieldsRecursive(t reflect.Type, prefix string) ([]Column, 
 			}
 			idx, err := strconv.Atoi(indexStr)
 			if err != nil {
-				return nil, fmt.Errorf("invalid index value %q for field %s", indexStr, field.Name)
+				return nil, nil, fmt.Errorf("invalid index value %q for field %s", indexStr, field.Name)
 			}
 			colIndex = idx
 		} else {
@@ -131,5 +214,5 @@ func (p *parser) parseFieldsRecursive(t reflect.Type, prefix string) ([]Column, 
 		cols = append(cols, col)
 	}
 
-	return cols, nil
+	return cols, dynamicRules, nil
 }

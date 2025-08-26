@@ -2,20 +2,25 @@ package excelizemapper
 
 import (
 	"fmt"
+	"log/slog"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
 )
 
 const (
-	defaultTagKey        = "excelize-mapper"
-	defaultTagDelim      = ";"
-	defaultTagHeaderKey  = "header"
-	defaultTagIndexKey   = "index"
-	defaultTagWidthKey   = "width"
-	defaultTagFormatKey  = "format"
-	defaultTagDefaultKey = "default"
+	defaultTagKey           = "excelize-mapper"
+	defaultTagDelim         = ";"
+	defaultTagHeaderKey     = "header"
+	defaultTagIndexKey      = "index"
+	defaultTagWidthKey      = "width"
+	defaultTagFormatKey     = "format"
+	defaultTagDefaultKey    = "default"
+	defaultTagDynamicKey    = "dynamic"
+	defaultTagDynamicPosKey = "dynamicpos"
+	defaultTagDynamicValKey = "dynamicval"
 )
 
 type ExcelizeMapper struct {
@@ -37,20 +42,70 @@ func NewExcelizeMapper(opts ...Option) ExcelizeMapper {
 	return ExcelizeMapper{
 		options: op,
 		parser: parser{
-			tagKey:        op.tagKey,
-			autosort:      op.autoSort,
-			tagDelim:      defaultTagDelim,
-			tagHeaderKey:  defaultTagHeaderKey,
-			tagIndexKey:   defaultTagIndexKey,
-			tagDefaultKey: defaultTagDefaultKey,
-			tagFormatKey:  defaultTagFormatKey,
-			tagWidthKey:   defaultTagWidthKey,
+			tagKey:           op.tagKey,
+			autosort:         op.autoSort,
+			tagDelim:         defaultTagDelim,
+			tagHeaderKey:     defaultTagHeaderKey,
+			tagIndexKey:      defaultTagIndexKey,
+			tagDefaultKey:    defaultTagDefaultKey,
+			tagFormatKey:     defaultTagFormatKey,
+			tagWidthKey:      defaultTagWidthKey,
+			tagDynamicKey:    defaultTagDynamicKey,
+			tagDynamicPosKey: defaultTagDynamicPosKey,
+			tagDynamicValKey: defaultTagDynamicValKey,
 		},
 	}
 }
 
+// Already know data is slice
+func (em *ExcelizeMapper) parseSlice(rules *DynamicRules, model interface{}) []string {
+	var headers []string
+	modelValue := reflect.ValueOf(model)
+	for i := 0; i < modelValue.Len(); i++ {
+
+		modelEntry := modelValue.Index(i)
+		sliceEntries := modelEntry.FieldByName(rules.ParentFieldName)
+
+		for j := 0; j < sliceEntries.Len(); j++ {
+			entryVal := sliceEntries.Index(j)
+
+			header := rules.getReplacedHeader(entryVal)
+
+			if !slices.Contains(headers, header) {
+				headers = append(headers, header)
+			}
+		}
+
+	}
+
+	return headers
+}
+
+func (em *ExcelizeMapper) foreachValues(rules *DynamicRules, modelValue reflect.Value, cb func(string, string)) {
+
+	sliceEntries := modelValue.FieldByName(rules.ParentFieldName)
+	slog.Debug("modelValue",
+		"kind", sliceEntries.Type().Kind().String(),
+		"name", modelValue.Type().Name())
+
+	for j := 0; j < sliceEntries.Len(); j++ {
+		entry := sliceEntries.Index(j)
+		slog.Debug("entryVal", "name", entry.Type().Name())
+
+		header := rules.getReplacedHeader(entry)
+		slog.Debug("getReplacedHeader", "name", header)
+		slog.Debug("ValueField", "name", rules.ValueField)
+
+		val := entry.FieldByName(rules.ValueField)
+		slog.Debug("val", "value", val)
+
+		cb(header, fmt.Sprint(val))
+
+	}
+}
+
 func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interface{}) error {
-	columns, err := em.parser.parse(slice)
+	columns, dynamicRules, err := em.parser.parse(slice)
 	if err != nil {
 		return err
 	}
@@ -77,6 +132,16 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 				return fmt.Errorf("excelize ColumnNumberToName error: %w", err)
 			}
 			f.SetColWidth(sheet, colName, colName, width)
+		}
+	}
+
+	// Handle dynamic fields headers
+	var dynamicHeaders []string
+
+	if dynamicRules != nil {
+		dynamicHeaders = em.parseSlice(dynamicRules, slice)
+		if dynamicHeaders != nil {
+			headers = append(headers, dynamicHeaders...)
 		}
 	}
 
@@ -116,6 +181,20 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 			vals = append(vals, fieldValue.Interface())
 
 			currentIndex = column.ColumnIndex + 1
+		}
+
+		// Handle dynamic fields values
+		if len(dynamicHeaders) > 0 {
+			dynamicVals := make([]interface{}, len(dynamicHeaders))
+
+			em.foreachValues(dynamicRules, rowVal, func(niddle, val string) {
+				pos := slices.IndexFunc(dynamicHeaders, func(header string) bool {
+					return header == niddle
+				})
+				dynamicVals[pos] = val
+			})
+
+			vals = append(vals, dynamicVals...)
 		}
 
 		cell, err := excelize.CoordinatesToCellName(1, rowIndex+2)

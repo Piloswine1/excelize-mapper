@@ -1,6 +1,8 @@
 package excelizemapper
 
 import (
+	"log/slog"
+	"os"
 	"testing"
 	"time"
 
@@ -170,4 +172,51 @@ func TestCustomStyleSetData(t *testing.T) {
 	}
 
 	f.SaveAs("./testData/custom_style.xlsx")
+}
+
+type DynamicEntry struct {
+	Year    int     `excelize-mapper:"dynamicpos:$1"`
+	Quarter int     `excelize-mapper:"dynamicpos:$2"`
+	Value   float32 `excelize-mapper:"dynamicval:"`
+}
+
+type DynamicModel struct {
+	Text    string         `excelize-mapper:"header:Text;width:50"`
+	Dynamic []DynamicEntry `excelize-mapper:"dynamic:$1/$2"`
+}
+
+func TestDynamicSetData(t *testing.T) {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})))
+
+	sheetName := "sheet1"
+
+	originData := make([]DynamicModel, 0)
+
+	dynamicData := []DynamicEntry{{
+		Year:    2021,
+		Quarter: 1,
+		Value:   15.152,
+	}, {
+		Year:    2021,
+		Quarter: 2,
+		Value:   7.252,
+	}}
+
+	originData = append(originData,
+		DynamicModel{Text: "text1", Dynamic: dynamicData},
+		DynamicModel{Text: "text2", Dynamic: dynamicData},
+	)
+
+	mapper := NewExcelizeMapper()
+
+	f := excelize.NewFile()
+	defer f.Close()
+	err := mapper.SetData(f, sheetName, originData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.SaveAs("./testData/dynamic.xlsx")
 }
