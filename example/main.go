@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	excelizemapper "github.com/mking93/excelize-mapper"
+	excelizemapper "github.com/Piloswine1/excelize-mapper"
 
 	"github.com/xuri/excelize/v2"
 )
