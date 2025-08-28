@@ -175,14 +175,22 @@ func TestCustomStyleSetData(t *testing.T) {
 }
 
 type DynamicEntry struct {
-	Year    int     `excelize-mapper:"dynamicpos:$1"`
-	Quarter int     `excelize-mapper:"dynamicpos:$2"`
-	Value   float32 `excelize-mapper:"dynamicval:"`
+	Year    int      `excelize-mapper:"dynamicpos:$1"`
+	Quarter int      `excelize-mapper:"dynamicpos:$2"`
+	Value   *float64 `excelize-mapper:"dynamicval:"`
 }
 
 type DynamicModel struct {
-	Text    string         `excelize-mapper:"header:Text;width:50"`
-	Dynamic []DynamicEntry `excelize-mapper:"dynamic:$1/$2"`
+	CargoCode *int           `excelize-mapper:"header:CargoCode;width:50"`
+	Text      string         `excelize-mapper:"header:Text;width:50"`
+	Dynamic   []DynamicEntry `excelize-mapper:"dynamic:$1/$2"`
+}
+
+func floatPtr(f float64) *float64 {
+	return &f
+}
+func intPtr(i int) *int {
+	return &i
 }
 
 func TestDynamicSetData(t *testing.T) {
@@ -197,15 +205,19 @@ func TestDynamicSetData(t *testing.T) {
 	dynamicData := []DynamicEntry{{
 		Year:    2021,
 		Quarter: 1,
-		Value:   15.152,
+		Value:   floatPtr(2.124),
 	}, {
 		Year:    2021,
 		Quarter: 2,
-		Value:   7.252,
+		Value:   floatPtr(0.0),
+	}, {
+		Year:    2022,
+		Quarter: 1,
+		Value:   nil,
 	}}
 
 	originData = append(originData,
-		DynamicModel{Text: "text1", Dynamic: dynamicData},
+		DynamicModel{Text: "text1", Dynamic: dynamicData, CargoCode: intPtr(12041)},
 		DynamicModel{Text: "text2", Dynamic: dynamicData},
 	)
 

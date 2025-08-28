@@ -81,7 +81,7 @@ func (em *ExcelizeMapper) parseSlice(rules *DynamicRules, model interface{}) []s
 	return headers
 }
 
-func (em *ExcelizeMapper) foreachValues(rules *DynamicRules, modelValue reflect.Value, cb func(string, string)) {
+func (em *ExcelizeMapper) foreachValues(rules *DynamicRules, modelValue reflect.Value, cb func(string, any)) {
 
 	sliceEntries := modelValue.FieldByName(rules.ParentFieldName)
 	slog.Debug("modelValue",
@@ -99,8 +99,15 @@ func (em *ExcelizeMapper) foreachValues(rules *DynamicRules, modelValue reflect.
 		val := entry.FieldByName(rules.ValueField)
 		slog.Debug("val", "value", val)
 
-		cb(header, fmt.Sprint(val))
-
+		if val.Kind() == reflect.Ptr {
+			if val.IsNil() {
+				cb(header, "")
+			} else {
+				cb(header, val.Elem().Interface())
+			}
+		} else {
+			cb(header, val.Interface())
+		}
 	}
 }
 
@@ -165,7 +172,7 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 
 			if fieldValue.Kind() == reflect.Ptr {
 				if fieldValue.IsNil() {
-					fieldValue = reflect.Zero(fieldValue.Type().Elem())
+					fieldValue = reflect.ValueOf("")
 				} else {
 					fieldValue = fieldValue.Elem()
 				}
@@ -187,7 +194,7 @@ func (em *ExcelizeMapper) SetData(f *excelize.File, sheet string, slice interfac
 		if len(dynamicHeaders) > 0 {
 			dynamicVals := make([]interface{}, len(dynamicHeaders))
 
-			em.foreachValues(dynamicRules, rowVal, func(niddle, val string) {
+			em.foreachValues(dynamicRules, rowVal, func(niddle string, val any) {
 				pos := slices.IndexFunc(dynamicHeaders, func(header string) bool {
 					return header == niddle
 				})
